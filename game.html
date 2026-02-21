@@ -1,0 +1,2413 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>五行生肖·遗物试炼</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #0D0D0D;
+  --bg2: #141414;
+  --bg3: #1a1a1a;
+  --bg4: #212121;
+  --border: #2a2a2a;
+  --text: #e8d5b0;
+  --text-dim: #8a7a60;
+  --gold: #d4af37;
+  --gold-glow: rgba(212,175,55,0.4);
+  --red: #c0392b;
+  --green: #27ae60;
+  --blue: #2980b9;
+  --wood: #52c41a;
+  --fire: #ff4d4f;
+  --earth: #faad14;
+  --metal: #bfbfbf;
+  --water: #1890ff;
+  --radius: 12px;
+}
+
+html, body {
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "PingFang SC", "Microsoft YaHei", "黑体", sans-serif;
+  overflow-x: hidden;
+  line-height: 1.5;
+}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: var(--bg2); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+/* ── Screen container ── */
+.screen {
+  display: none;
+  min-height: 100vh;
+  padding: 16px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+.screen.active { display: flex; flex-direction: column; gap: 12px; }
+
+/* ── Top HUD ── */
+#hud {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 16px;
+  background: var(--bg2);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+.hud-item {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 14px;
+  font-weight: 600;
+}
+.hud-icon { font-size: 18px; }
+.hud-val { color: var(--gold); min-width: 32px; }
+.hud-armor-val { color: #8ebbff; min-width: 32px; }
+.hud-life { display: flex; gap: 4px; }
+.life-dot {
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  background: var(--red);
+  box-shadow: 0 0 6px var(--red);
+  transition: all .3s;
+}
+.life-dot.empty { background: #333; box-shadow: none; }
+.life-dot.losing {
+  animation: lifeLosePulse .5s ease forwards;
+}
+@keyframes lifeLosePulse {
+  0%   { transform: scale(1.8); background: #ff0000; box-shadow: 0 0 18px #ff0000; }
+  60%  { transform: scale(0.4); background: #333; box-shadow: none; }
+  100% { transform: scale(1);   background: #333; box-shadow: none; }
+}
+
+/* ── Life loss overlay ── */
+#life-loss-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+  background: radial-gradient(ellipse at center, rgba(192,57,43,0.55) 0%, rgba(192,57,43,0) 70%);
+  animation: lifeLoseFlash .6s ease-out forwards;
+}
+@keyframes lifeLoseFlash {
+  0%   { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* ── Floating life-loss text ── */
+.life-loss-float {
+  position: fixed;
+  pointer-events: none;
+  z-index: 10000;
+  font-size: 28px;
+  font-weight: 900;
+  color: #ff4444;
+  text-shadow: 0 0 16px #ff0000, 0 0 32px #ff0000;
+  animation: floatUp 1.2s ease-out forwards;
+  white-space: nowrap;
+}
+@keyframes floatUp {
+  0%   { opacity: 1; transform: translateY(0) scale(1.2); }
+  80%  { opacity: 0.6; }
+  100% { opacity: 0; transform: translateY(-80px) scale(0.8); }
+}
+
+/* ── Node map ── */
+#map-bar {
+  display: flex; align-items: center;
+  gap: 2px;
+  padding: 10px 14px;
+  background: var(--bg2);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  overflow-x: auto;
+}
+.map-node {
+  width: 32px; height: 32px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px;
+  flex-shrink: 0;
+  transition: all .3s;
+  position: relative;
+}
+.map-node.done { border-color: #444; color: #444; background: #1c1c1c; }
+.map-node.current { border-color: var(--gold); color: var(--gold); box-shadow: 0 0 10px var(--gold-glow); }
+.map-node.future { border-color: #333; color: #555; }
+.map-connector {
+  flex: 1; height: 2px; background: var(--border); min-width: 8px; flex-shrink: 0;
+}
+.map-connector.done-conn { background: #444; }
+
+/* ── Section card ── */
+.card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+}
+.card-title {
+  font-size: 16px; font-weight: 700;
+  color: var(--gold);
+  margin-bottom: 12px;
+  letter-spacing: 1px;
+  display: flex; align-items: center; gap: 8px;
+}
+.card-title::before {
+  content: "";
+  display: inline-block; width: 4px; height: 16px;
+  background: var(--gold); border-radius: 2px;
+}
+
+/* ── Wheel area ── */
+#wheel-wrap {
+  display: flex; justify-content: center; align-items: center;
+  padding: 8px;
+  background: var(--bg2);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  align-self: center;
+}
+canvas#wheel {
+  border-radius: 50%;
+  cursor: pointer;
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+/* ── Two-column main layout ── */
+#battle-main {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+#wheel-col {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex-shrink: 0;
+}
+#right-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+/* ── Bet panel ── */
+#bet-panel {
+  display: flex; flex-direction: column; gap: 10px;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px;
+  box-sizing: border-box;
+}
+
+/* ── Bet hint ── */
+#bet-hint {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: var(--bg3);
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  font-size: 14px;
+  font-weight: 600;
+  flex-wrap: wrap;
+}
+#bet-hint .hint-label { color: var(--text-dim); font-size: 12px; }
+#bet-hint .hint-elem { font-weight: 700; }
+#bet-hint .hint-sep { color: var(--text-dim); }
+#bet-hint .hint-zod { font-weight: 700; }
+
+/* ── Zodiac select ── */
+#zod-select {
+  padding: 5px 10px;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-size: 14px;
+  cursor: pointer;
+  font-family: inherit;
+}
+#zod-select:focus { outline: none; border-color: var(--gold); }
+#zod-select option { background: var(--bg2); }
+
+/* ── Bet controls ── */
+#bet-row {
+  display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+}
+.bet-label { font-size: 13px; color: var(--text-dim); }
+.bet-chip {
+  display: flex; gap: 6px; flex-wrap: wrap;
+  align-items: center;
+}
+.chip {
+  padding: 4px 12px;
+  border-radius: 20px;
+  border: 1px solid #333;
+  background: var(--bg3);
+  color: var(--text-dim);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all .2s;
+}
+.chip:hover { border-color: var(--gold); color: var(--gold); }
+.chip.active {
+  border-color: var(--gold);
+  color: #000;
+  background: var(--gold);
+  font-weight: 700;
+}
+#bet-selector {
+  display: flex; gap: 8px; align-items: center;
+}
+#bet-input {
+  width: 90px;
+  padding: 6px 10px;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-size: 14px;
+  text-align: center;
+}
+#bet-input:focus { outline: none; border-color: var(--gold); }
+
+.bet-sel-group {
+  display: flex; gap: 8px; align-items: center;
+}
+.bet-sel-label {
+  font-size: 13px; color: var(--text-dim); white-space: nowrap;
+}
+
+/* ── Element chips ── */
+.elem-chip {
+  padding: 4px 10px;
+  border-radius: 20px;
+  border: 2px solid transparent;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all .2s;
+  font-weight: 600;
+}
+.elem-chip:hover { filter: brightness(1.3); }
+.elem-chip.active { box-shadow: 0 0 8px currentColor; border-color: currentColor; filter: brightness(1.3); }
+
+/* ── Zodiac chips ── */
+.zod-chip {
+  padding: 3px 8px;
+  border-radius: 16px;
+  border: 2px solid transparent;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all .2s;
+}
+.zod-chip.active { box-shadow: 0 0 6px currentColor; border-color: currentColor; }
+
+/* ── Spin button ── */
+#spin-btn {
+  padding: 12px 28px;
+  background: linear-gradient(135deg, #8B6914, var(--gold));
+  color: #000;
+  border: none;
+  border-radius: 10px;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all .2s;
+  letter-spacing: 2px;
+  box-shadow: 0 0 20px var(--gold-glow);
+  align-self: center;
+  margin-top: 4px;
+}
+#spin-btn:hover:not(:disabled) { transform: scale(1.04); box-shadow: 0 0 30px var(--gold-glow); }
+#spin-btn:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+
+/* ── Result display ── */
+#result-panel {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  display: none;
+  animation: fadeIn .4s ease;
+}
+#result-panel.show { display: block; }
+#result-content {
+  display: flex; flex-direction: column; gap: 8px;
+}
+.result-row {
+  display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+}
+.result-tag {
+  padding: 3px 10px;
+  border-radius: 14px;
+  font-size: 13px;
+  font-weight: 700;
+}
+.result-win { background: rgba(39,174,96,.25); color: #5ddb8e; border: 1px solid #27ae60; }
+.result-lose { background: rgba(192,57,43,.25); color: #e74c3c; border: 1px solid var(--red); }
+.result-bonus { background: rgba(212,175,55,.2); color: var(--gold); border: 1px solid #7d6400; }
+.payout-big {
+  font-size: 22px; font-weight: 800;
+  color: var(--gold);
+  text-shadow: 0 0 12px var(--gold);
+}
+.payout-neg { color: #e74c3c; text-shadow: 0 0 12px #e74c3c; }
+#next-btn {
+  margin-top: 10px;
+  padding: 10px 24px;
+  background: var(--bg3);
+  border: 1px solid var(--gold);
+  border-radius: 10px;
+  color: var(--gold);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all .2s;
+  letter-spacing: 1px;
+}
+#next-btn:hover { background: rgba(212,175,55,.1); }
+
+/* ── Relics display ── */
+#relics-bar {
+  display: flex; gap: 8px; overflow-x: auto;
+  padding: 10px 14px;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  min-height: 48px;
+}
+.relic-badge {
+  display: flex; align-items: center; gap: 6px;
+  padding: 5px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+  border: 1px solid;
+  white-space: nowrap;
+  cursor: default;
+  position: relative;
+  flex-shrink: 0;
+}
+.relic-badge:hover { filter: brightness(1.2); }
+.rarity-common { border-color: #666; color: #aaa; background: rgba(100,100,100,.15); }
+.rarity-rare { border-color: #3498db; color: #56d8ff; background: rgba(52,152,219,.15); }
+.rarity-epic { border-color: #9b59b6; color: #d8a7ea; background: rgba(155,89,182,.15); }
+.rarity-legendary { border-color: var(--gold); color: var(--gold); background: rgba(212,175,55,.15); box-shadow: 0 0 8px rgba(212,175,55,.3); }
+
+/* ── Shop screen ── */
+#shop-items {
+  display: flex; flex-direction: column; gap: 12px;
+}
+.shop-card {
+  display: flex; gap: 12px; align-items: center;
+  padding: 14px;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  transition: all .2s;
+}
+.shop-card:hover { border-color: #444; }
+.shop-card.sold { opacity: .45; }
+.shop-info { flex: 1; }
+.shop-name { font-size: 15px; font-weight: 700; margin-bottom: 4px; }
+.shop-desc { font-size: 12px; color: var(--text-dim); }
+.shop-price {
+  font-size: 14px; color: var(--gold); font-weight: 600;
+  white-space: nowrap;
+}
+.shop-buy-btn {
+  padding: 7px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--gold);
+  background: transparent;
+  color: var(--gold);
+  font-size: 13px; font-weight: 600;
+  cursor: pointer;
+  transition: all .2s;
+}
+.shop-buy-btn:hover:not(:disabled) { background: rgba(212,175,55,.15); }
+.shop-buy-btn:disabled { opacity: .4; cursor: not-allowed; }
+#shop-leave-btn {
+  padding: 12px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--bg3);
+  color: var(--text-dim);
+  font-size: 14px; font-weight: 600;
+  cursor: pointer;
+  transition: all .2s;
+}
+#shop-leave-btn:hover { border-color: var(--gold); color: var(--gold); }
+
+/* ── Reward screen ── */
+#reward-items {
+  display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;
+}
+.reward-card {
+  flex: 1; min-width: 180px; max-width: 200px;
+  padding: 18px 14px;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: all .25s;
+  text-align: center;
+  display: flex; flex-direction: column; gap: 8px; align-items: center;
+}
+.reward-card:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(0,0,0,.5); }
+.reward-card.common { border-color: #555; }
+.reward-card.rare { border-color: #3498db; box-shadow: 0 0 12px rgba(52,152,219,.2); }
+.reward-card.epic { border-color: #9b59b6; box-shadow: 0 0 12px rgba(155,89,182,.25); }
+.reward-card.legendary { border-color: var(--gold); box-shadow: 0 0 16px var(--gold-glow); }
+.reward-icon { font-size: 32px; }
+.reward-name { font-size: 16px; font-weight: 700; }
+.reward-rarity { font-size: 12px; }
+.reward-desc { font-size: 12px; color: var(--text-dim); line-height: 1.4; }
+.skip-btn {
+  margin-top: 8px;
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid #333;
+  background: transparent;
+  color: #666;
+  font-size: 13px;
+  cursor: pointer;
+}
+.skip-btn:hover { color: var(--text-dim); border-color: #555; }
+
+/* ── Start screen ── */
+#start-screen {
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+}
+.title-main {
+  font-size: 42px; font-weight: 900;
+  color: var(--gold);
+  text-shadow: 0 0 30px rgba(212,175,55,.6), 0 0 60px rgba(212,175,55,.3);
+  letter-spacing: 4px;
+  margin-bottom: 8px;
+}
+.title-sub {
+  font-size: 16px; color: var(--text-dim); margin-bottom: 32px;
+  letter-spacing: 2px;
+}
+.elem-strip {
+  display: flex; gap: 12px; justify-content: center; margin-bottom: 32px;
+}
+.elem-orb {
+  width: 52px; height: 52px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px; font-weight: 800;
+  border: 2px solid;
+  box-shadow: 0 0 16px currentColor;
+}
+.start-btn {
+  padding: 16px 52px;
+  font-size: 20px; font-weight: 700;
+  letter-spacing: 3px;
+  background: linear-gradient(135deg, #7d5500, var(--gold));
+  color: #000;
+  border: none;
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: all .2s;
+  box-shadow: 0 0 30px var(--gold-glow);
+}
+.start-btn:hover { transform: scale(1.04); box-shadow: 0 0 50px rgba(212,175,55,.5); }
+.rules-hint { font-size: 13px; color: #555; margin-top: 20px; }
+
+/* ── Game over / victory ── */
+.end-screen {
+  display: none;
+  flex-direction: column;
+  gap: 16px;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  min-height: 100vh;
+}
+.end-screen.active { display: flex; }
+.end-title {
+  font-size: 48px; font-weight: 900;
+  letter-spacing: 4px;
+  text-shadow: 0 0 30px currentColor;
+}
+.end-title.lose { color: #c0392b; }
+.end-title.win { color: var(--gold); }
+.end-stats { font-size: 16px; color: var(--text-dim); }
+.end-restart-btn {
+  padding: 14px 40px;
+  font-size: 16px; font-weight: 700;
+  letter-spacing: 2px;
+  background: var(--bg3);
+  border: 1px solid var(--gold);
+  color: var(--gold);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: all .2s;
+}
+.end-restart-btn:hover { background: rgba(212,175,55,.1); }
+
+/* ── Anims ── */
+@keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes pulse { 0%,100% { box-shadow: 0 0 12px var(--gold-glow); } 50% { box-shadow: 0 0 28px rgba(212,175,55,.7); } }
+@keyframes spin-glow {
+  0%,100% { text-shadow: 0 0 8px currentColor; }
+  50% { text-shadow: 0 0 20px currentColor, 0 0 36px currentColor; }
+}
+
+.tooltip {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%; transform: translateX(-50%);
+  background: #1a1a1a;
+  border: 1px solid #444;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 12px;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 100;
+  opacity: 0;
+  transition: opacity .2s;
+  color: var(--text);
+}
+.relic-badge:hover .tooltip { opacity: 1; }
+
+/* Five elements view in rotation indicator */
+#spin-indicator {
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: 13px; color: var(--text-dim);
+  padding: 6px 0;
+}
+.spin-result-elem, .spin-result-zod {
+  font-size: 15px; font-weight: 700;
+}
+
+/* Enemy HP bar (boss feel) */
+#enemy-info {
+  display: flex; align-items: flex-start; gap: 12px;
+}
+.enemy-left-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  width: 116px;
+}
+.enemy-icon-big { font-size: 36px; line-height:1; }
+.enemy-meta { flex:1; min-width:0; }
+.enemy-name-row { display:flex; align-items:center; gap:8px; margin-bottom:5px; }
+.enemy-name { font-size: 15px; color: #e767a0; font-weight: 700; }
+.enemy-hp-nums { font-size: 12px; color: #666; }
+.enemy-hp-bar { width:100%; height: 10px; background: #1c1c1c; border-radius: 5px; overflow: hidden; }
+.enemy-hp-fill { height: 100%; background: linear-gradient(90deg, #7f1d1d, #c0392b, #e74c3c); border-radius: 5px; transition: width .6s; }
+.enemy-shield-bar { width:100%; height:6px; background:#1c2a3a; border-radius:3px; overflow:hidden; margin-top:4px; }
+.enemy-shield-fill { height:100%; background:linear-gradient(90deg,#2563eb,#60a5fa); border-radius:3px; transition:width .5s; }
+.enemy-shield-row { display:flex; align-items:center; gap:6px; margin-top:4px; font-size:11px; color:#60a5fa; }
+.enemy-skills-row {
+  display:flex;
+  gap:6px;
+  flex-wrap:wrap;
+  justify-content:center;
+}
+.eskill-badge {
+  display:inline-flex; align-items:center; gap:4px;
+  padding: 3px 9px; border-radius:14px;
+  font-size:11px; border:1px solid; white-space:nowrap;
+}
+.eskill-badge.active { box-shadow: 0 0 8px currentColor; }
+.eskill-badge { cursor: pointer; }
+.enemy-active-line { margin-top:6px; font-size:12px; color:#888; min-height:18px; }
+
+/* ── Skill popup ── */
+.eskill-popup {
+  position: fixed;
+  z-index: 2000;
+  background: #1e1e2e;
+  border: 1px solid #555;
+  border-radius: 10px;
+  padding: 10px 14px;
+  max-width: 260px;
+  font-size: 13px;
+  color: var(--text);
+  box-shadow: 0 4px 24px rgba(0,0,0,0.7);
+  pointer-events: none;
+  animation: fadeIn .15s ease;
+  line-height: 1.5;
+}
+.eskill-popup .pop-name { font-weight: 800; margin-bottom: 5px; font-size: 14px; }
+.eskill-popup .pop-desc { color: #c0b090; }
+.hp-flash { animation: hp-shake .4s ease; }
+@keyframes hp-shake { 0%,100%{transform:none} 25%{transform:translateX(-3px)} 75%{transform:translateX(3px)} }
+
+/* Node type icons */
+.node-battle::after { content: "⚔"; font-size: 11px; }
+.node-shop::after { content: "🏪"; font-size: 11px; }
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════ START SCREEN ══════════════════════════ -->
+<div id="start-screen" class="screen active">
+  <div class="title-main">五行生肖</div>
+  <div class="title-sub">遗物试炼 · 轮盘奇境</div>
+  <div class="elem-strip">
+    <div class="elem-orb" style="color:#52c41a;border-color:#52c41a;background:rgba(82,196,26,.12)">木</div>
+    <div class="elem-orb" style="color:#ff4d4f;border-color:#ff4d4f;background:rgba(255,77,79,.12)">火</div>
+    <div class="elem-orb" style="color:#faad14;border-color:#faad14;background:rgba(250,173,20,.12)">土</div>
+    <div class="elem-orb" style="color:#bfbfbf;border-color:#bfbfbf;background:rgba(191,191,191,.12)">金</div>
+    <div class="elem-orb" style="color:#1890ff;border-color:#1890ff;background:rgba(24,144,255,.12)">水</div>
+  </div>
+  <button class="start-btn" onclick="startGame()">新开一局</button>
+  <div class="rules-hint">押注五行与生肖 · 以遗物为器 · 一局即命运</div>
+</div>
+
+<!-- ══════════════════════════ BATTLE SCREEN ══════════════════════════ -->
+<div id="battle-screen" class="screen">
+  <!-- HUD -->
+  <div id="hud">
+    <div class="hud-item">
+      <span class="hud-icon">🪙</span>
+      <span class="bet-label">金币</span>
+      <span class="hud-val" id="hud-gold">100</span>
+    </div>
+    <div class="hud-item">
+      <span class="hud-icon">🛡</span>
+      <span class="bet-label">护甲</span>
+      <span class="hud-armor-val" id="hud-armor">0</span>
+    </div>
+    <div class="hud-item" style="flex:1;justify-content:flex-end">
+      <span class="hud-icon">❤️</span>
+      <div class="hud-life" id="hud-life"></div>
+    </div>
+  </div>
+
+  <!-- Node map -->
+  <div id="map-bar"></div>
+
+  <!-- Enemy bar area -->
+  <div class="card" id="enemy-card">
+    <div id="enemy-info">
+      <div class="enemy-left-col">
+        <div class="enemy-icon-big" id="enemy-icon">🗡️</div>
+        <div class="enemy-skills-row" id="enemy-skills"></div>
+      </div>
+      <div class="enemy-meta">
+        <div class="enemy-name-row">
+          <span class="enemy-name" id="enemy-name">界门守卫</span>
+          <span class="enemy-hp-nums" id="enemy-hp-nums">150/150</span>
+        </div>
+        <div class="enemy-hp-bar"><div class="enemy-hp-fill" id="enemy-hp-fill" style="width:100%"></div></div>
+        <div id="enemy-shield-row" class="enemy-shield-row" style="display:none">
+          🛡 护盾：<div class="enemy-shield-bar" style="flex:1"><div class="enemy-shield-fill" id="enemy-shield-fill" style="width:100%"></div></div>
+          <span id="enemy-shield-nums"></span>
+        </div>
+      </div>
+    </div>
+    <div class="enemy-active-line" id="enemy-active-effect"></div>
+  </div>
+
+  <!-- Wheel + right panel in two columns -->
+  <div id="battle-main">
+
+    <!-- Left col: wheel -->
+    <div id="wheel-col">
+      <div id="wheel-wrap">
+        <canvas id="wheel" width="420" height="420"></canvas>
+      </div>
+      <div id="spin-indicator"></div>
+    </div>
+
+    <!-- Right col: bet + result + relics -->
+    <div id="right-col">
+
+      <!-- Bet Panel -->
+      <div id="bet-panel">
+        <div class="card-title">下注</div>
+
+        <!-- Bet hint: current selection -->
+        <div id="bet-hint">
+          <span class="hint-label">当前押注：</span>
+          <span class="hint-elem" id="hint-elem">木</span>
+          <span class="hint-sep">·</span>
+          <span class="hint-zod" id="hint-zod">鼠</span>
+        </div>
+
+        <!-- Bet amount -->
+        <div class="bet-sel-group">
+          <span class="bet-sel-label">金额：</span>
+          <input type="number" id="bet-input" min="10" max="9999" value="20">
+          <div class="bet-chip">
+            <span class="chip" onclick="setBet(10)">10</span>
+            <span class="chip" onclick="setBet(30)">30</span>
+            <span class="chip" onclick="setBet(50)">50</span>
+            <span class="chip" onclick="setBet(100)">100</span>
+            <span class="chip" onclick="setAllIn()">全押</span>
+          </div>
+        </div>
+
+        <!-- Element bet -->
+        <div class="bet-sel-group" style="gap:8px;">
+          <span class="bet-sel-label">五行：</span>
+          <div class="bet-chip" id="elem-chips"></div>
+        </div>
+
+        <!-- Zodiac bet: dropdown -->
+        <div class="bet-sel-group" style="gap:8px;">
+          <span class="bet-sel-label">生肖：</span>
+          <select id="zod-select" onchange="selectZod(+this.value)"></select>
+        </div>
+
+        <!-- Actions -->
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+          <button id="spin-btn" onclick="doSpin()">旋转</button>
+        </div>
+      </div>
+
+      <!-- Result panel -->
+      <div id="result-panel">
+        <div class="card-title">结算</div>
+        <div id="result-content"></div>
+        <button id="next-btn" onclick="onNext()">继续</button>
+      </div>
+
+      <!-- Relics bar -->
+      <div class="card">
+        <div class="card-title">遗物</div>
+        <div id="relics-bar"></div>
+      </div>
+
+    </div><!-- /right-col -->
+  </div><!-- /battle-main -->
+</div>
+
+<!-- ══════════════════════════ SHOP SCREEN ══════════════════════════ -->
+<div id="shop-screen" class="screen">
+  <div id="hud" style="display:flex"><!-- will be injected --></div>
+  <div id="map-bar-shop"></div>
+  <div class="card">
+    <div class="card-title">遗物商店</div>
+    <div id="shop-items"></div>
+  </div>
+  <button id="shop-leave-btn" onclick="leaveShop()">离开商店，前进</button>
+  <div class="card">
+    <div class="card-title">遗物</div>
+    <div id="relics-bar-shop"></div>
+  </div>
+</div>
+
+<!-- ══════════════════════════ REWARD SCREEN ══════════════════════════ -->
+<div id="reward-screen" class="screen">
+  <div class="card" style="text-align:center">
+    <div class="card-title" style="justify-content:center">战斗胜利！选择一件遗物</div>
+    <div id="reward-items"></div>
+    <button class="skip-btn" onclick="skipReward()">放弃遗物，直接前进</button>
+  </div>
+</div>
+
+<!-- ══════════════════════════ START RELIC SCREEN ══════════════════════════ -->
+<div id="start-relic-screen" class="screen">
+  <div class="card" style="text-align:center;max-width:700px;margin:60px auto">
+    <div class="card-title" style="justify-content:center;font-size:18px">✨ 踏上旅途，选择一件起始遗物</div>
+    <div id="start-relic-items" style="margin:16px 0"></div>
+    <button class="skip-btn" onclick="skipStartRelic()">无需遗物，直接出发</button>
+  </div>
+</div>
+
+<!-- ══════════════════════════ GAME OVER ══════════════════════════ -->
+<div id="gameover-screen" class="end-screen">
+  <div class="end-title lose">命元耗尽</div>
+  <p class="end-stats" id="go-stats"></p>
+  <button class="end-restart-btn" onclick="startGame()">再战一局</button>
+</div>
+
+<!-- ══════════════════════════ VICTORY ══════════════════════════ -->
+<div id="victory-screen" class="end-screen">
+  <div class="end-title win">试炼完成</div>
+  <p class="end-stats" id="vic-stats"></p>
+  <button class="end-restart-btn" onclick="startGame()">再战一局</button>
+</div>
+
+<script>
+//  CONSTANTS
+const MULT = { element: 2.2, zodiac: 4.0, bothBonus: 3.8, sheng: 0.8, kePenaltyRate: 0.25 };
+
+const ELEMENTS = [
+  { name:'木', color:'#52c41a', dark:'#1a4a00', bg:'rgba(82,196,26,.12)' },
+  { name:'火', color:'#ff4d4f', dark:'#5c0000', bg:'rgba(255,77,79,.12)' },
+  { name:'土', color:'#faad14', dark:'#5c3a00', bg:'rgba(250,173,20,.12)' },
+  { name:'金', color:'#bfbfbf', dark:'#3a3a3a', bg:'rgba(191,191,191,.12)' },
+  { name:'水', color:'#1890ff', dark:'#002766', bg:'rgba(24,144,255,.12)' },
+];
+// 相生 index: SHENG[i] = what element i generates (木生火 火生土 土生金 金生水 水生木)
+const SHENG = [1,2,3,4,0];
+// 相克 index: KE[i] = what element i overcomes (木克土 火克金 土克水 金克木 水克火)
+const KE = [2,3,4,0,1];
+
+const ZODIACS = [
+  { name:'鼠', color:'#a855f7' },
+  { name:'牛', color:'#6b7280' },
+  { name:'虎', color:'#f97316' },
+  { name:'兔', color:'#f472b6' },
+  { name:'龙', color:'#eab308' },
+  { name:'蛇', color:'#4ade80' },
+  { name:'马', color:'#ef4444' },
+  { name:'羊', color:'#a3e635' },
+  { name:'猴', color:'#fb923c' },
+  { name:'鸡', color:'#818cf8' },
+  { name:'狗', color:'#c084fc' },
+  { name:'猪', color:'#f9a8d4' },
+];
+
+const NODE_SEQ = ['battle','shop','battle','shop','battle','shop','battle','battle'];
+
+const RELICS_DATA = [
+  // Common
+  {
+    id:'qingmuy', name:'青木花', rarity:'common', price:30, icon:'🌿',
+    desc:'持有时，下注木元素不受相克惩罚。',
+    effect: { noKePenalty: 0 }
+  },
+  {
+    id:'chiyanfu', name:'赤炎符', rarity:'common', price:30, icon:'🔥',
+    desc:'火元素命中时，额外获得下注额×0.5的金币。',
+    effect: { elemBonus: {ei:1, mult:0.5} }
+  },
+  {
+    id:'houtuyin', name:'厚土印', rarity:'common', price:30, icon:'🪨',
+    desc:'每场战斗胜利后获得1点护甲。',
+    effect: { winArmor: 1 }
+  },
+  {
+    id:'xuanshui', name:'玄水镜', rarity:'common', price:30, icon:'💧',
+    desc:'水元素命中时，相克惩罚转化为0.3×下注额奖励。',
+    effect: { waterReflect: true }
+  },
+  {
+    id:'baijin', name:'白金刃', rarity:'common', price:30, icon:'⚔️',
+    desc:'金元素命中时额外获得下注额×0.3金币。',
+    effect: { elemBonus: {ei:3, mult:0.3} }
+  },
+  {
+    id:'huangtufu', name:'黄土符', rarity:'common', price:30, icon:'🟨',
+    desc:'土元素命中时额外获得下注额×0.3金币。',
+    effect: { elemBonus: {ei:2, mult:0.3} }
+  },
+  {
+    id:'zhuyueling', name:'逐月铃', rarity:'common', price:30, icon:'🌙',
+    desc:'生肖命中时额外获得下注额×0.2金币。',
+    effect: { zodBonus: 0.2 }
+  },
+  {
+    id:'jubao', name:'小聚宝盆', rarity:'common', price:30, icon:'🏺',
+    desc:'每场战斗胜利后额外获得8金币。',
+    effect: { winGold: 8 }
+  },
+  {
+    id:'zhisun', name:'止损签', rarity:'common', price:30, icon:'🧷',
+    desc:'每场战斗首次失败时，命元损失-1。',
+    effect: { firstLoseLifeMinus: 1 }
+  },
+  // Rare
+  {
+    id:'shenghuan', name:'生生环', rarity:'rare', price:60, icon:'🔄',
+    desc:'相生命中倍率提高2倍（每场仅一次）。',
+    effect: { shengDoubleOnce: true }
+  },
+  {
+    id:'kezhi', name:'克制令', rarity:'rare', price:60, icon:'📜',
+    desc:'持有时，本次旋转结果不会落在克制你所选五行的元素上。',
+    effect: { avoidKe: true }
+  },
+  {
+    id:'wudelun', name:'五德轮', rarity:'rare', price:60, icon:'🎡',
+    desc:'每场战斗首次双命中时，额外获得下注额×1.2金币。',
+    effect: { firstBothBonus: 1.2 }
+  },
+  {
+    id:'niming', name:'逆命骨牌', rarity:'rare', price:60, icon:'🀄',
+    desc:'每场战斗首次触发相克时，相克惩罚减半。',
+    effect: { firstKeHalf: true }
+  },
+  {
+    id:'fengrang', name:'封禳符', rarity:'rare', price:60, icon:'🧿',
+    desc:'每场战斗中敌方首次技能触发时，效果减半。',
+    effect: { firstEnemySkillHalf: true }
+  },
+  // Legendary
+  {
+    id:'shuangyi', name:'双仪盘', rarity:'legendary', price:150, icon:'☯️',
+    desc:'每次旋转后重掷阴阳子集，下一次旋转结果限定在阳面区域。',
+    effect: { yinYang: true }
+  },
+  {
+    id:'longmen', name:'龙门卦', rarity:'legendary', price:150, icon:'🐉',
+    desc:'每次旋转后重掷移除位，随机移除1个生肖和1个五行，持续缩小下一轮转盘范围。',
+    effect: { dragonRemove: true }
+  },
+  {
+    id:'lunhui', name:'轮回盘', rarity:'legendary', price:150, icon:'💎',
+    desc:'将相克的五行惩罚转化为等额奖励，化克为利。',
+    effect: { keToReward: true }
+  },
+  {
+    id:'taiyi', name:'太一仪', rarity:'legendary', price:150, icon:'👑',
+    desc:'每场战斗可重转一次（取两次中更高收益），每场仅一次。',
+    effect: { bestOfTwoOncePerBattle: true }
+  },
+  {
+    id:'mingtu', name:'命途录', rarity:'legendary', price:150, icon:'📘',
+    desc:'最大命元+3，并立即回复3点命元。',
+    effect: { lifeBook: true }
+  },
+];
+
+const RARITY_LABEL = { common:'普通', rare:'稀有', epic:'史诗', legendary:'传说' };
+
+//  GAME STATE
+let gs = {};
+function makeState() {
+  return {
+    gold: 150,
+    life: 10,
+    armor: 0,
+    maxLife: 10,
+    nodeIndex: 0,
+    relics: [],           // relic ids owned
+    currentEnemy: null,    // live enemy object with hp/shield/roundCount
+    // Pending spin result (set before animation)
+    pendingElem: null,
+    pendingZod: null,
+    // Current bet
+    betAmount: 20,
+    betElem: 0,
+    betZod: 0,
+    // Wheel angles (accum)
+    outerAngle: 0,
+    innerAngle: 0,
+    spinning: false,
+    settled: false,       // current round settled
+    // 生还卦：once-per-game sheng double
+    shenghuanUsed: false,
+    // 龙门卦: removed zodiacs/elements
+    availableElems: null,  // null = all 5, else array of available indices
+    availableZods: null,   // null = all 12, else array of available indices
+    // 双仪卦：yang subsets
+    yangElems: null,
+    yangZods: null,
+    // battle-scoped relic flags
+    wudelunUsed: false,
+    nimingUsed: false,
+    zhisunUsed: false,
+    taiyiUsed: false,
+    fengrangUsed: false,
+    taiyiTriggeredThisSpin: false,
+  };
+}
+
+function hasRelic(id) { return gs.relics.includes(id); }
+function ownedRelicData() { return gs.relics.map(id => RELICS_DATA.find(r=>r.id===id)); }
+
+function resetBattleRelicFlags() {
+  gs.wudelunUsed = false;
+  gs.nimingUsed = false;
+  gs.zhisunUsed = false;
+  gs.taiyiUsed = false;
+  gs.fengrangUsed = false;
+  gs.taiyiTriggeredThisSpin = false;
+}
+
+function rerollSpinRelicState() {
+  if(hasRelic('longmen')) {
+    const elems = [0,1,2,3,4];
+    const zods = Array.from({length:12}, (_,i)=>i);
+    if(elems.length > 2) elems.splice(Math.floor(Math.random() * elems.length), 1);
+    for(let i = 0; i < 3 && zods.length > 3; i++) {
+      zods.splice(Math.floor(Math.random() * zods.length), 1);
+    }
+    gs.availableElems = elems;
+    gs.availableZods = zods;
+  } else {
+    gs.availableElems = null;
+    gs.availableZods = null;
+  }
+
+  if(hasRelic('shuangyi')) {
+    const elems = gs.availableElems ? gs.availableElems.slice() : [0,1,2,3,4];
+    const zods = gs.availableZods ? gs.availableZods.slice() : Array.from({length:12}, (_,i)=>i);
+    gs.yangElems = elems.slice().sort(() => Math.random() - 0.5).slice(0, Math.ceil(elems.length * 0.6));
+    gs.yangZods = zods.slice().sort(() => Math.random() - 0.5).slice(0, Math.ceil(zods.length / 2));
+  } else {
+    gs.yangElems = null;
+    gs.yangZods = null;
+  }
+
+  if(gs.availableElems && !gs.availableElems.includes(gs.betElem)) selectElem(gs.availableElems[0]);
+  if(gs.availableZods && !gs.availableZods.includes(gs.betZod)) selectZod(gs.availableZods[0]);
+}
+
+// Apply special on-acquire effects for certain relics
+function applyRelicOnAcquire(id) {
+  if(id === 'longmen' || id === 'shuangyi') {
+    rerollSpinRelicState();
+    drawWheel();
+  }
+  if(id === 'mingtu') {
+    gs.maxLife += 3;
+    gs.life = Math.min(gs.maxLife, gs.life + 3);
+    renderHUD();
+  }
+}
+
+//  SCREEN MANAGEMENT
+function showScreen(id) {
+  document.querySelectorAll('.screen,.end-screen').forEach(s => {
+    s.classList.remove('active');
+  });
+  const sc = document.getElementById(id);
+  if(sc) sc.classList.add('active');
+}
+
+//  START / INIT
+function startGame() {
+  gs = makeState();
+  gs.currentEnemy = initEnemy(getEnemyForNode(0));
+  resetBattleRelicFlags();
+  renderZodChips();
+  selectElem(0);
+  selectZod(0);
+  gs.betAmount = 20;
+  document.getElementById('bet-input').value = 20;
+  gs.settled = false;
+  document.getElementById('result-panel').classList.remove('show');
+  // Show starting relic choice before battle
+  showStartRelicChoice();
+}
+
+function showStartRelicChoice() {
+  const pool = RELICS_DATA.slice().sort(() => Math.random() - 0.5).slice(0, 3);
+  const container = document.getElementById('start-relic-items');
+  container.innerHTML = '';
+  pool.forEach(r => {
+    const card = document.createElement('div');
+    card.className = `reward-card ${r.rarity}`;
+    card.innerHTML = `
+      <div class="reward-icon">${r.icon}</div>
+      <div class="reward-name">${r.name}</div>
+      <div class="reward-rarity" style="color:${rarityColor(r.rarity)}">${RARITY_LABEL[r.rarity]}</div>
+      <div class="reward-desc">${r.desc}</div>
+    `;
+    card.onclick = () => { gs.relics.push(r.id); applyRelicOnAcquire(r.id); beginBattle(); };
+    container.appendChild(card);
+  });
+  showScreen('start-relic-screen');
+}
+
+function skipStartRelic() { beginBattle(); }
+
+function beginBattle() {
+  resetBattleRelicFlags();
+  rerollSpinRelicState();
+  showScreen('battle-screen');
+  renderHUD();
+  renderMap();
+  renderRelicsBar();
+  updateEnemyInfo();
+  drawWheel();
+}
+
+//  LIFE LOSS EFFECT
+function showLifeLossEffect(amount) {
+  // 1. Screen flash overlay
+  let overlay = document.getElementById('life-loss-overlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'life-loss-overlay';
+    document.body.appendChild(overlay);
+  }
+  overlay.style.display = 'block';
+  overlay.style.animation = 'none';
+  overlay.offsetHeight; // reflow
+  overlay.style.animation = 'lifeLoseFlash 0.6s ease-out forwards';
+  overlay.addEventListener('animationend', () => { overlay.style.display = 'none'; }, { once: true });
+
+  // 2. Floating text near HUD life area
+  const lifeEl = document.getElementById('hud-life');
+  if (lifeEl) {
+    const rect = lifeEl.getBoundingClientRect();
+    const floatEl = document.createElement('div');
+    floatEl.className = 'life-loss-float';
+    floatEl.textContent = `鈭?{amount} 命元`;
+    floatEl.style.left = (rect.left + rect.width / 2 - 40) + 'px';
+    floatEl.style.top  = (rect.top - 10) + 'px';
+    document.body.appendChild(floatEl);
+    floatEl.addEventListener('animationend', () => floatEl.remove(), { once: true });
+  }
+
+  // 3. Animate the dot(s) that just turned empty
+  const lc = document.getElementById('hud-life');
+  if (lc) {
+    const dots = lc.querySelectorAll('.life-dot');
+    // The first `gs.life` dots are still active; the ones just after are the newly lost
+    for (let i = gs.life; i < gs.life + amount; i++) {
+      if (dots[i]) {
+        dots[i].classList.remove('losing');
+        void dots[i].offsetWidth;
+        dots[i].classList.add('losing');
+        dots[i].addEventListener('animationend', () => dots[i].classList.remove('losing'), { once: true });
+      }
+    }
+  }
+}
+
+//  HUD RENDER
+function renderHUD() {
+  document.getElementById('hud-gold').textContent = gs.gold;
+  document.getElementById('hud-armor').textContent = gs.armor;
+  // Life
+  const lc = document.getElementById('hud-life');
+  lc.innerHTML = '';
+  for(let i=0;i<gs.maxLife;i++) {
+    const d = document.createElement('div');
+    d.className = 'life-dot' + (i >= gs.life ? ' empty' : '');
+    lc.appendChild(d);
+  }
+  // Shop HUD
+  const shud = document.querySelector('#shop-screen #hud');
+  if(shud) syncShopHud(shud);
+}
+
+function syncShopHud(el) {
+  el.innerHTML = `
+    <div class="hud-item"><span class="hud-icon">🪙</span><span class="bet-label">金币</span><span class="hud-val">${gs.gold}</span></div>
+    <div class="hud-item"><span class="hud-icon">🛡</span><span class="bet-label">护甲</span><span class="hud-armor-val">${gs.armor}</span></div>
+    <div class="hud-item" style="flex:1;justify-content:flex-end"><span class="hud-icon">❤️</span>
+      <div class="hud-life">${Array.from({length:gs.maxLife},(_,i)=>`<div class="life-dot${i>=gs.life?' empty':''}"></div>`).join('')}</div>
+    </div>`;
+}
+
+//  NODE MAP
+function renderMap() {
+  const bar = document.getElementById('map-bar');
+  bar.innerHTML = '';
+  NODE_SEQ.forEach((type, i) => {
+    if(i>0) {
+      const conn = document.createElement('div');
+      conn.className = 'map-connector' + (i <= gs.nodeIndex ? ' done-conn' : '');
+      bar.appendChild(conn);
+    }
+    const nd = document.createElement('div');
+    nd.className = 'map-node';
+    if(i < gs.nodeIndex) nd.classList.add('done');
+    else if(i === gs.nodeIndex) nd.classList.add('current');
+    else nd.classList.add('future');
+    nd.classList.add(`node-${type}`);
+    nd.style.fontSize = '11px';
+    nd.textContent = type==='battle' ? '⚔' : '🪙';
+    nd.title = (type==='battle'?'战斗':'商店') + ` (节点${i+1})`;
+    bar.appendChild(nd);
+  });
+  // Shop map copy
+  const shopBar = document.getElementById('map-bar-shop');
+  if(shopBar) shopBar.innerHTML = bar.innerHTML;
+}
+
+//  ENEMY INFO
+//  ENEMY DATA  (5 battle encounters)
+const ENEMIES = [
+  // 第1关：入门，无技能
+  {
+    id:'gate_guard', name:'界门守卫', icon:'🗡️', hp:80, color:'#9ca3af',
+    desc:'试炼之门的守卫者，实力平稳。',
+    skills:[]
+  },
+  // 第2关：轻度干扰
+  {
+    id:'yiming_judge', name:'幽冥判官', icon:'⚖️', hp:150, color:'#a855f7',
+    desc:'以生死簿裁决众生，偶尔施加额外惩罚。',
+    skills:[
+      { name:'幽冥判决', icon:'☠️', color:'#a855f7',
+        desc:'偶数回合若你方落败，额外扣除1命元。',
+        type:'onLoseEvenExtraLife' }
+    ]
+  },
+  // 第3关：封印与克制强化
+  {
+    id:'wuxing_taoist', name:'五行道士', icon:'☯️', hp:250, color:'#faad14',
+    desc:'精通五行生克，以封印与克制强化为兵刃。',
+    skills:[
+      { name:'元素封印', icon:'🔒', color:'#faad14',
+        desc:'每回合随机封印一种五行，命中该元素时奖励减半。',
+        type:'sealElem' },
+      { name:'克制强化', icon:'⚡', color:'#ff4d4f',
+        desc:'相克惩罚倍率提高。',
+        type:'doubleKePenalty' }
+    ]
+  },
+  // 第4关：护盾+复苏
+  {
+    id:'reincarnation', name:'轮回使者', icon:'🌀', hp:350, shield:50, color:'#22d3ee',
+    desc:'掌控生死轮回，以护盾与复苏抗衡。',
+    skills:[
+      { name:'轮回护盾', icon:'🛡️', color:'#60a5fa',
+        desc:'拥有50点护盾，受到伤害时优先消耗护盾。',
+        type:'shield' },
+      { name:'轮回复苏', icon:'💚', color:'#22d3ee',
+        desc:'血量降至40%及以下时回复80HP（仅触发一次）。',
+        type:'revive40pct' }
+    ]
+  },
+  // 第5关：终极BOSS
+  {
+    id:'dayanshu', name:'大衍术士', icon:'✡️', hp:480, color:'#d4af37',
+    desc:'掌握大衍之数，以天机推演命运。',
+    skills:[
+      { name:'大衍宣言', icon:'📯', color:'#fbbf24',
+        desc:'每回合宣言一种五行，命中宣言五行时伤害提高。',
+        type:'declare' },
+      { name:'七星回煞', icon:'⭐', color:'#ef4444',
+        desc:'每3回合触发一次：玩家本轮净收益减少30。',
+        type:'every3reduce30' },
+      { name:'天机壁障', icon:'🌌', color:'#818cf8',
+        desc:'双命中时额外加成减半。',
+        type:'halveDouble' }
+    ]
+  }
+];
+
+// Map battle index 鈫?ENEMIES index (node 0→E0, node2→E1, node4→E2, node6→E3, node7→E4)
+function getEnemyForNode(nodeIdx) {
+  const battleNodes = NODE_SEQ.reduce((a,t,i)=>{ if(t==='battle') a.push(i); return a; },[]);
+  const bi = battleNodes.indexOf(nodeIdx);
+  return ENEMIES[Math.min(bi, ENEMIES.length-1)];
+}
+
+function initEnemy(template) {
+  return {
+    ...template,
+    hp:      template.hp,
+    maxHp:   template.hp,
+    shield:  template.shield || 0,
+    maxShield: template.shield || 0,
+    roundCount: 0,
+    sealedElem: null,
+    declaredElem: null,
+    revivedOnce: false,
+    activeSkillTypes: [],
+    betElem: null,
+    betZod: null,
+  };
+}
+
+function hasEnemySkill(enemy, type) {
+  return !!(enemy && enemy.skills && enemy.skills.some(s => s.type === type));
+}
+
+function updateEnemyInfo() {
+  const e = gs.currentEnemy;
+  if(!e) return;
+  document.getElementById('enemy-icon').textContent = e.icon;
+  document.getElementById('enemy-name').textContent = e.name;
+  document.getElementById('enemy-name').style.color = e.color;
+  document.getElementById('enemy-hp-nums').textContent = `${Math.max(0,e.hp)}/${e.maxHp}`;
+  const hpPct = Math.max(0, e.hp / e.maxHp * 100);
+  document.getElementById('enemy-hp-fill').style.width = hpPct+'%';
+
+  // Shield
+  const shieldRow = document.getElementById('enemy-shield-row');
+  if(e.maxShield > 0) {
+    shieldRow.style.display = '';
+    document.getElementById('enemy-shield-fill').style.width = Math.max(0,e.shield/e.maxShield*100)+'%';
+    document.getElementById('enemy-shield-nums').textContent = `${Math.max(0,e.shield)}/${e.maxShield}`;
+  } else {
+    shieldRow.style.display = 'none';
+  }
+
+  // Skills
+  const skillsEl = document.getElementById('enemy-skills');
+  skillsEl.innerHTML = '';
+  e.skills.forEach(sk => {
+    const b = document.createElement('span');
+    b.className = 'eskill-badge';
+    if((e.activeSkillTypes || []).includes(sk.type)) b.classList.add('active');
+    b.style.color = sk.color; b.style.borderColor = sk.color+'66';
+    b.style.background = sk.color+'18';
+    b.textContent = sk.icon + ' ' + sk.name;
+    b.onclick = (ev) => { ev.stopPropagation(); showSkillPopup(sk, b); };
+    skillsEl.appendChild(b);
+  });
+
+  // Active effect line (declared / sealed)
+  const activeEl = document.getElementById('enemy-active-effect');
+  const lines = [];
+  if(e.sealedElem !== null) {
+    lines.push(`🔒 封印：${ELEMENTS[e.sealedElem].name}（命中此元素奖励减半）`);
+  }
+  if(e.declaredElem !== null) {
+    lines.push(`📯 宣言：${ELEMENTS[e.declaredElem].name}（命中此元素伤害×2）`);
+  }
+  if(e.betElem !== null && e.betZod !== null) {
+    lines.push(`🎯 敌方押注：${ELEMENTS[e.betElem].name} · ${ZODIACS[e.betZod].name}`);
+  }
+  activeEl.textContent = lines.join(' · ');
+}
+
+function showSkillPopup(sk, anchor) {
+  document.querySelectorAll('.eskill-popup').forEach(p => p.remove());
+  const popup = document.createElement('div');
+  popup.className = 'eskill-popup';
+  popup.innerHTML = `<div class="pop-name" style="color:${sk.color}">${sk.icon} ${sk.name}</div><div class="pop-desc">${sk.desc}</div>`;
+  document.body.appendChild(popup);
+  const rect = anchor.getBoundingClientRect();
+  let top  = rect.bottom + 8;
+  let left = rect.left;
+  // keep inside viewport
+  requestAnimationFrame(() => {
+    if (left + popup.offsetWidth > window.innerWidth - 8) left = window.innerWidth - popup.offsetWidth - 8;
+    if (top + popup.offsetHeight > window.innerHeight - 8) top = rect.top - popup.offsetHeight - 8;
+    popup.style.top  = top  + 'px';
+    popup.style.left = left + 'px';
+  });
+  const dismiss = () => { popup.remove(); document.removeEventListener('click', dismiss); };
+  setTimeout(() => document.addEventListener('click', dismiss), 0);
+}
+
+function showRelicPopup(r, anchor) {
+  document.querySelectorAll('.eskill-popup').forEach(p => p.remove());
+  const popup = document.createElement('div');
+  popup.className = 'eskill-popup';
+  const rc = rarityColor(r.rarity);
+  popup.innerHTML = `<div class="pop-name" style="color:${rc}">${r.icon} ${r.name} <span style="font-size:11px;font-weight:400;color:${rc}88">${RARITY_LABEL[r.rarity]}</span></div><div class="pop-desc">${r.desc}</div>`;
+  document.body.appendChild(popup);
+  const rect = anchor.getBoundingClientRect();
+  let top  = rect.top - 8;
+  let left = rect.left;
+  requestAnimationFrame(() => {
+    top = top - popup.offsetHeight;
+    if (top < 8) top = rect.bottom + 8;
+    if (left + popup.offsetWidth > window.innerWidth - 8) left = window.innerWidth - popup.offsetWidth - 8;
+    popup.style.top  = top  + 'px';
+    popup.style.left = left + 'px';
+  });
+  const dismiss = () => { popup.remove(); document.removeEventListener('click', dismiss); };
+  setTimeout(() => document.addEventListener('click', dismiss), 0);
+}
+
+//  ZODIAC SELECT
+function renderZodChips() {
+  const sel = document.getElementById('zod-select');
+  if (!sel) return;
+  sel.innerHTML = '';
+  const availZods = gs.availableZods || Array.from({length:12}, (_,i)=>i);
+  availZods.forEach(i => {
+    const z = ZODIACS[i];
+    const opt = document.createElement('option');
+    opt.value = i;
+    opt.textContent = z.name;
+    sel.appendChild(opt);
+  });
+  sel.value = gs.betZod;
+
+  // Render element chips dynamically
+  const chipsContainer = document.getElementById('elem-chips');
+  if(chipsContainer) {
+    chipsContainer.innerHTML = '';
+    const availElems = gs.availableElems || [0,1,2,3,4];
+    availElems.forEach(i => {
+      const e = ELEMENTS[i];
+      const chip = document.createElement('span');
+      chip.className = 'elem-chip' + (i === gs.betElem ? ' active' : '');
+      chip.dataset.ei = i;
+      chip.style.color = e.color;
+      chip.style.background = e.bg;
+      chip.textContent = e.name;
+      chip.onclick = () => selectElem(i);
+      chipsContainer.appendChild(chip);
+    });
+  }
+}
+
+function updateBetHint() {
+  const eEl = document.getElementById('hint-elem');
+  const zEl = document.getElementById('hint-zod');
+  if (!eEl || !zEl) return;
+  const e = ELEMENTS[gs.betElem];
+  const z = ZODIACS[gs.betZod];
+  eEl.textContent = e.name;
+  eEl.style.color  = e.color;
+  zEl.textContent  = z.name;
+  zEl.style.color  = z.color;
+}
+
+function selectElem(ei) {
+  gs.betElem = ei;
+  document.querySelectorAll('.elem-chip').forEach(c => {
+    c.classList.toggle('active', +c.dataset.ei === ei);
+  });
+  updateBetHint();
+  drawWheel();
+}
+
+function selectZod(zi) {
+  gs.betZod = zi;
+  const sel = document.getElementById('zod-select');
+  if (sel) sel.value = zi;
+  updateBetHint();
+  drawWheel();
+}
+
+function setBet(v) {
+  gs.betAmount = Math.min(v, gs.gold);
+  document.getElementById('bet-input').value = gs.betAmount;
+}
+function setAllIn() {
+  gs.betAmount = gs.gold;
+  document.getElementById('bet-input').value = gs.betAmount;
+}
+document.getElementById('bet-input').addEventListener('change', e => {
+  gs.betAmount = Math.max(1, Math.min(+e.target.value || 0, gs.gold));
+  e.target.value = gs.betAmount;
+});
+
+//  WHEEL CANVAS DRAWING
+const OUTER_R = 200, INNER_R1 = 155, INNER_R2 = 95, CENTER_R = 95;
+const CANVAS_SIZE = 420;
+const CX = CANVAS_SIZE/2, CY = CANVAS_SIZE/2;
+
+function drawWheel(outerAngle, innerAngle, glowElem, glowZod) {
+  outerAngle = outerAngle ?? gs.outerAngle;
+  innerAngle = innerAngle ?? gs.innerAngle;
+  glowElem   = glowElem   ?? gs.betElem;
+  glowZod    = glowZod    ?? gs.betZod;
+
+  const canvas = document.getElementById('wheel');
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0,0,CANVAS_SIZE,CANVAS_SIZE);
+
+  // Available elements and zodiacs (affected by 龙门卦)
+  const availElems = gs.availableElems || [0,1,2,3,4];
+  const availZods  = gs.availableZods  || Array.from({length:12}, (_,i)=>i);
+  const numElems = availElems.length;
+  const numZods  = availZods.length;
+
+  // Shadow background circle
+  ctx.save();
+  ctx.shadowColor = '#d4af3766';
+  ctx.shadowBlur = 24;
+  ctx.beginPath(); ctx.arc(CX,CY,OUTER_R+6,0,2*Math.PI);
+  ctx.fillStyle = '#0a0a0a'; ctx.fill();
+  ctx.restore();
+
+  // ── Outer ring: zodiacs ──
+  const ZOD_SLICE = (2*Math.PI)/numZods;
+  ctx.save(); ctx.translate(CX,CY); ctx.rotate(outerAngle);
+  availZods.forEach((zi,i) => {
+    const z = ZODIACS[zi];
+    const startA = i*ZOD_SLICE - Math.PI/2;
+    const endA   = startA + ZOD_SLICE;
+    const isGlow = (zi === glowZod);
+    // 双仪盘：阴面半透明
+    const isYin = gs.yangZods && !gs.yangZods.includes(zi);
+    ctx.beginPath();
+    ctx.moveTo(0,0);
+    ctx.arc(0,0,OUTER_R,startA,endA);
+    ctx.closePath();
+    ctx.fillStyle = isGlow ? z.color+'cc' : isYin ? z.color+'15' : z.color+'33';
+    if(isGlow) {
+      ctx.shadowColor = z.color;
+      ctx.shadowBlur = 18;
+    } else {
+      ctx.shadowBlur = 0;
+    }
+    ctx.fill();
+    ctx.strokeStyle = '#0D0D0D';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Zodiac text
+    const midA = startA + ZOD_SLICE/2;
+    const tx = Math.cos(midA)*(OUTER_R+INNER_R1)/2;
+    const ty = Math.sin(midA)*(OUTER_R+INNER_R1)/2;
+    ctx.save();
+    ctx.translate(tx,ty); ctx.rotate(midA + Math.PI/2);
+    ctx.font = isGlow ? 'bold 18px sans-serif' : '14px sans-serif';
+    ctx.fillStyle = isGlow ? '#fff' : isYin ? z.color+'55' : z.color+'cc';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.shadowColor = isGlow ? z.color : 'transparent';
+    ctx.shadowBlur  = isGlow ? 10 : 0;
+    ctx.fillText(z.name + (isYin ? '☯ ' : ''), 0, 0);
+    ctx.restore();
+  });
+  ctx.restore();
+
+  // ── Inner ring: elements ──
+  const ELEM_SLICE = (2*Math.PI)/numElems;
+  ctx.save(); ctx.translate(CX,CY); ctx.rotate(innerAngle);
+  availElems.forEach((ei,i) => {
+    const e = ELEMENTS[ei];
+    const startA = i*ELEM_SLICE - Math.PI/2;
+    const endA   = startA + ELEM_SLICE;
+    const isGlow = (ei === glowElem);
+    const isYin = gs.yangElems && !gs.yangElems.includes(ei);
+    ctx.beginPath();
+    ctx.arc(0,0,INNER_R1,startA,endA);
+    ctx.arc(0,0,INNER_R2,endA,startA,true);
+    ctx.closePath();
+    ctx.fillStyle = isGlow ? e.color+'cc' : isYin ? e.color+'18' : e.color+'44';
+    if(isGlow) { ctx.shadowColor=e.color; ctx.shadowBlur=20; }
+    else { ctx.shadowBlur=0; }
+    ctx.fill();
+    ctx.strokeStyle = '#0D0D0D'; ctx.lineWidth = 2; ctx.stroke();
+
+    // Element text
+    const midA = startA + ELEM_SLICE/2;
+    const tr = (INNER_R1+INNER_R2)/2;
+    const tx = Math.cos(midA)*tr;
+    const ty = Math.sin(midA)*tr;
+    ctx.save();
+    ctx.translate(tx,ty); ctx.rotate(midA+Math.PI/2);
+    ctx.font = isGlow ? 'bold 22px sans-serif' : '16px sans-serif';
+    ctx.fillStyle = isGlow ? '#fff' : isYin ? e.color+'55' : e.color+'ee';
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.shadowColor = isGlow ? e.color : 'transparent';
+    ctx.shadowBlur  = isGlow ? 12 : 0;
+    ctx.fillText(e.name + (isYin ? '☯ ' : ''), 0, 0);
+    ctx.restore();
+  });
+  ctx.restore();
+
+  // ── Center circle: element pie ──
+  ctx.save(); ctx.translate(CX,CY); ctx.rotate(innerAngle);
+  availElems.forEach((ei,i) => {
+    const e = ELEMENTS[ei];
+    const startA = i*ELEM_SLICE - Math.PI/2;
+    const endA   = startA + ELEM_SLICE;
+    ctx.beginPath();
+    ctx.moveTo(0,0);
+    ctx.arc(0,0,CENTER_R, startA, endA);
+    ctx.closePath();
+    const grad = ctx.createRadialGradient(0,0,0, 0,0,CENTER_R);
+    grad.addColorStop(0, e.color+'ff');
+    grad.addColorStop(1, e.dark+'ff');
+    ctx.fillStyle = grad;
+    ctx.shadowBlur=0;
+    ctx.fill();
+  });
+  ctx.restore();
+
+  // Center separator ring
+  ctx.save(); ctx.translate(CX,CY);
+  ctx.beginPath(); ctx.arc(0,0,INNER_R2,0,2*Math.PI);
+  ctx.strokeStyle = '#0D0D0D33'; ctx.lineWidth = 3; ctx.stroke();
+  ctx.beginPath(); ctx.arc(0,0,INNER_R1,0,2*Math.PI);
+  ctx.strokeStyle = '#0D0D0D66'; ctx.lineWidth = 3; ctx.stroke();
+  ctx.beginPath(); ctx.arc(0,0,OUTER_R+2,0,2*Math.PI);
+  ctx.strokeStyle = '#d4af3766'; ctx.lineWidth = 3; ctx.stroke();
+  ctx.restore();
+
+  // ── Top indicator line ──
+  ctx.save(); ctx.translate(CX,CY);
+  ctx.strokeStyle = '#d4af37';
+  ctx.lineWidth = 3;
+  ctx.lineCap = 'round';
+  ctx.shadowColor = '#d4af37';
+  ctx.shadowBlur = 12;
+  ctx.beginPath();
+  ctx.moveTo(0, -OUTER_R-12);
+  ctx.lineTo(0, -OUTER_R+6);
+  ctx.stroke();
+  // Triangle
+  ctx.fillStyle = '#d4af37';
+  ctx.beginPath();
+  ctx.moveTo(-7, -OUTER_R-14);
+  ctx.lineTo(7, -OUTER_R-14);
+  ctx.lineTo(0, -OUTER_R+8);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+
+// ── Wheel click to select bet (while not spinning) ──
+document.getElementById('wheel').addEventListener('click', function(e) {
+  if(gs.spinning || gs.settled) return;
+  const rect = this.getBoundingClientRect();
+  const scaleX = CANVAS_SIZE / rect.width;
+  const scaleY = CANVAS_SIZE / rect.height;
+  const mx = (e.clientX - rect.left) * scaleX - CX;
+  const my = (e.clientY - rect.top ) * scaleY - CY;
+  const dist = Math.sqrt(mx*mx+my*my);
+
+  if(dist > OUTER_R) return;
+
+  const availElems = gs.availableElems || [0,1,2,3,4];
+  const availZods  = gs.availableZods  || Array.from({length:12}, (_,i)=>i);
+
+  if(dist >= INNER_R1 && dist <= OUTER_R) {
+    const rawA = Math.atan2(my,mx) - gs.outerAngle;
+    const normA = ((rawA + Math.PI/2) % (2*Math.PI) + 2*Math.PI) % (2*Math.PI);
+    const idx = Math.floor(normA / (2*Math.PI/availZods.length));
+    if(idx < availZods.length) selectZod(availZods[idx]);
+  } else if(dist >= INNER_R2 && dist < INNER_R1) {
+    const rawA = Math.atan2(my,mx) - gs.innerAngle;
+    const normA = ((rawA + Math.PI/2) % (2*Math.PI) + 2*Math.PI) % (2*Math.PI);
+    const idx = Math.floor(normA / (2*Math.PI/availElems.length));
+    if(idx < availElems.length) selectElem(availElems[idx]);
+  }
+});
+
+//  SPIN ANIMATION
+
+function buildSpinPools() {
+  let elemPool = gs.availableElems ? gs.availableElems.slice() : [0,1,2,3,4];
+  let zodPool = gs.availableZods ? gs.availableZods.slice() : Array.from({length:12}, (_,i)=>i);
+
+  // 鍏嬪埗浠わ細鎺掗櫎鍏嬪埗鎵€閫変簲琛岀殑鍏冪礌
+  if(hasRelic('kezhi')) elemPool = elemPool.filter(e => KE[e] !== gs.betElem);
+
+  // 双仪盘：结果限定在阳面
+  if(hasRelic('shuangyi') && gs.yangElems) {
+    const yangInPool = elemPool.filter(e => gs.yangElems.includes(e));
+    if(yangInPool.length > 0) elemPool = yangInPool;
+  }
+  if(hasRelic('shuangyi') && gs.yangZods) {
+    const yangInPool = zodPool.filter(z => gs.yangZods.includes(z));
+    if(yangInPool.length > 0) zodPool = yangInPool;
+  }
+  return { elemPool, zodPool };
+}
+
+function rollSpinResult() {
+  const { elemPool, zodPool } = buildSpinPools();
+  return {
+    elem: elemPool[Math.floor(Math.random() * elemPool.length)],
+    zod: zodPool[Math.floor(Math.random() * zodPool.length)]
+  };
+}
+
+function calcNetGainPreview(rElem, rZod) {
+  const bet = gs.betAmount;
+  const bElem = gs.betElem;
+  const bZod = gs.betZod;
+  const enemy = gs.currentEnemy;
+
+  let gain = -bet;
+  const elemHit = (rElem === bElem);
+  const zodHit = (rZod === bZod);
+  const bothHit = elemHit && zodHit;
+
+  if(elemHit) {
+    let eGain = bet * MULT.element;
+    if(enemy && enemy.sealedElem === rElem && hasEnemySkill(enemy, 'sealElem')) {
+      const half = hasRelic('fengrang') && !gs.fengrangUsed;
+      eGain *= half ? 0.75 : 0.5;
+    }
+    gain += eGain;
+    if(hasRelic('chiyanfu') && rElem===1) gain += bet*0.5;
+    if(hasRelic('baijin') && rElem===3) gain += bet*0.3;
+    if(hasRelic('huangtufu') && rElem===2) gain += bet*0.3;
+  }
+  if(zodHit) {
+    gain += bet * MULT.zodiac;
+    if(hasRelic('zhuyueling')) gain += bet * 0.2;
+  }
+  if(bothHit) {
+    let bonus = bet * MULT.bothBonus;
+    if(hasEnemySkill(enemy, 'halveDouble')) {
+      const half = hasRelic('fengrang') && !gs.fengrangUsed;
+      bonus *= half ? 0.75 : 0.5;
+    }
+    gain += bonus;
+    if(hasRelic('wudelun') && !gs.wudelunUsed) gain += bet * 1.2;
+  }
+  if(SHENG[rElem] === bElem && !elemHit) {
+    let sm = MULT.sheng;
+    if(hasRelic('shenghuan') && !gs.shenghuanUsed) sm *= 2;
+    gain += bet * sm;
+  }
+  if(KE[rElem] === bElem) {
+    const strongerKe = hasEnemySkill(enemy, 'doubleKePenalty');
+    let keMult = strongerKe ? MULT.kePenaltyRate * 2 : MULT.kePenaltyRate;
+    if(strongerKe && hasRelic('fengrang') && !gs.fengrangUsed) keMult = MULT.kePenaltyRate * 1.5;
+    if(hasRelic('niming') && !gs.nimingUsed) keMult *= 0.5;
+    if(hasRelic('lunhui')) gain += bet * keMult;
+    else if(hasRelic('kezhi')) {}
+    else if(hasRelic('xuanshui') && rElem===4) gain += bet * 0.3;
+    else if(hasRelic('qingmuy') && bElem===0) {}
+    else gain -= bet * keMult;
+  }
+  if(hasEnemySkill(enemy, 'every3reduce30') && enemy.roundCount % 3 === 0) {
+    gain -= (hasRelic('fengrang') && !gs.fengrangUsed) ? 15 : 30;
+  }
+  return Math.round(gain);
+}
+
+function calcEnemyNetBasic(rElem, rZod, bet, enemyElem, enemyZod) {
+  let gain = -bet;
+  const elemHit = (rElem === enemyElem);
+  const zodHit = (rZod === enemyZod);
+  const bothHit = elemHit && zodHit;
+  if(elemHit) gain += bet * MULT.element;
+  if(zodHit) gain += bet * MULT.zodiac;
+  if(bothHit) gain += bet * MULT.bothBonus;
+  if(SHENG[rElem] === enemyElem && !elemHit) gain += bet * MULT.sheng;
+  if(KE[rElem] === enemyElem) gain -= bet * MULT.kePenaltyRate;
+  return Math.round(gain);
+}
+
+function doSpin() {
+  if(gs.spinning || gs.settled) return;
+  const bet = Math.max(1, +document.getElementById('bet-input').value || gs.betAmount);
+  if(bet > gs.gold) { alert('金币不足'); return; }
+  gs.betAmount = bet;
+  gs.settled = false;
+  gs.spinning = true;
+  document.getElementById('spin-btn').disabled = true;
+  document.getElementById('result-panel').classList.remove('show');
+
+  // Enemy round-start: increment round, randomize sealed/declared elem
+  const enemy = gs.currentEnemy;
+  if(enemy) {
+    enemy.roundCount++;
+    enemy.activeSkillTypes = [];
+    enemy.sealedElem = null;
+    enemy.declaredElem = null;
+    enemy.betElem = Math.floor(Math.random()*5);
+    enemy.betZod = Math.floor(Math.random()*12);
+    enemy.skills.forEach(sk => {
+      if(sk.type === 'sealElem') {
+        enemy.sealedElem = Math.floor(Math.random()*5);
+        enemy.activeSkillTypes.push('sealElem');
+      }
+      if(sk.type === 'declare') {
+        enemy.declaredElem = Math.floor(Math.random()*5);
+        enemy.activeSkillTypes.push('declare');
+      }
+    });
+    updateEnemyInfo();
+  }
+
+  gs.taiyiTriggeredThisSpin = false;
+  let roll = rollSpinResult();
+
+  if(hasRelic('taiyi') && !gs.taiyiUsed) {
+    const alt = rollSpinResult();
+    const g1 = calcNetGainPreview(roll.elem, roll.zod);
+    const g2 = calcNetGainPreview(alt.elem, alt.zod);
+    if(g2 > g1) roll = alt;
+    gs.taiyiUsed = true;
+    gs.taiyiTriggeredThisSpin = true;
+  }
+
+  gs.pendingElem = roll.elem;
+  gs.pendingZod  = roll.zod;
+
+  animateSpin(roll.elem, roll.zod, () => {
+    gs.spinning = false;
+    gs.settled = true;
+    settle(roll.elem, roll.zod);
+    // Longmen/Shuangyi reroll after each completed spin for the next spin.
+    rerollSpinRelicState();
+    drawWheel();
+  });
+}
+
+
+function animateSpin(resultElem, resultZod, onDone) {
+  const availElems = gs.availableElems || [0,1,2,3,4];
+  const availZods  = gs.availableZods  || Array.from({length:12}, (_,i)=>i);
+  const numElems = availElems.length;
+  const numZods  = availZods.length;
+
+  // Map actual index to position in available arrays
+  const elemPos = availElems.indexOf(resultElem);
+  const zodPos  = availZods.indexOf(resultZod);
+
+  const extraOuter = (5 + Math.floor(Math.random()*4)) * 2*Math.PI;
+  const extraInner = (4 + Math.floor(Math.random()*4)) * 2*Math.PI;
+
+  const outerEnd = gs.outerAngle + extraOuter + computeTargetOffset(gs.outerAngle, zodPos,  numZods);
+  const innerEnd = gs.innerAngle + extraInner + computeTargetOffset(gs.innerAngle, elemPos, numElems);
+
+  const startOuter = gs.outerAngle;
+  const startInner = gs.innerAngle;
+  const duration = 3500 + Math.random()*800;
+  let startTime = null;
+
+  function easeOut(t) { return 1 - Math.pow(1-t, 3); }
+
+  function frame(ts) {
+    if(!startTime) startTime = ts;
+    const elapsed = ts - startTime;
+    const t = Math.min(elapsed/duration, 1);
+    const et = easeOut(t);
+
+    const curOuter = startOuter + (outerEnd - startOuter)*et;
+    const curInner = startInner + (innerEnd - startInner)*et;
+
+    drawWheel(curOuter, curInner);
+
+    if(t < 1) {
+      requestAnimationFrame(frame);
+    } else {
+      gs.outerAngle = outerEnd;
+      gs.innerAngle = innerEnd;
+      gs.outerAngle = ((gs.outerAngle % (2*Math.PI)) + 2*Math.PI) % (2*Math.PI);
+      gs.innerAngle = ((gs.innerAngle % (2*Math.PI)) + 2*Math.PI) % (2*Math.PI);
+      drawWheel(gs.outerAngle, gs.innerAngle, resultElem, resultZod);
+      onDone();
+    }
+  }
+  requestAnimationFrame(frame);
+}
+
+function computeTargetOffset(currentAngle, resultIdx, total) {
+  // Segments are drawn starting at -π/2 (top). After ctx.rotate(outerAngle),
+  // the center of segment i appears at canvas angle: (i*slice + slice/2 - π/2) + outerAngle.
+  // For that center to align with the top indicator at -π/2:
+  //   i*slice + slice/2 - π/2 + outerAngle_final = -π/2
+  //   outerAngle_final = -(i*slice + slice/2)
+  // Required delta (always positive, minimum rotation):
+  const slice = (2*Math.PI) / total;
+  const targetAngle = -(resultIdx * slice + slice/2);
+  let offset = (targetAngle - currentAngle) % (2*Math.PI);
+  if (offset <= 0) offset += 2*Math.PI;
+  return offset;
+}
+
+//  SETTLEMENT LOGIC
+function settle(rElem, rZod) {
+  const bet    = gs.betAmount;
+  const bElem  = gs.betElem;
+  const bZod   = gs.betZod;
+  const enemy  = gs.currentEnemy;
+  const addEnemyActive = (type) => {
+    if(!enemy) return;
+    enemy.activeSkillTypes = enemy.activeSkillTypes || [];
+    if(!enemy.activeSkillTypes.includes(type)) enemy.activeSkillTypes.push(type);
+  };
+
+  let gain = -bet; // start with bet loss
+  const tags = [];
+
+  const elemHit = (rElem === bElem);
+  const zodHit  = (rZod  === bZod);
+  const bothHit = elemHit && zodHit;
+
+  if(gs.taiyiTriggeredThisSpin) {
+    tags.push({text:'👑 太一仪：本回合择优取值', cls:'result-bonus'});
+  }
+
+  // ── 元素命中 ──
+  if(elemHit) {
+    let eGain = bet * MULT.element;
+    let elemShownMult = MULT.element;
+    // 五行道士【元素封印】：封印命中时，元素奖励减半
+    if(enemy && enemy.sealedElem === rElem && hasEnemySkill(enemy, 'sealElem')) {
+      if(hasRelic('fengrang') && !gs.fengrangUsed) {
+        eGain *= 0.75;
+        elemShownMult *= 0.75;
+        gs.fengrangUsed = true;
+        tags.push({text:`🧿 封禳符：元素封印效果减半`, cls:'result-bonus'});
+      } else {
+        eGain *= 0.5;
+        elemShownMult *= 0.5;
+      }
+      addEnemyActive('sealElem');
+      tags.push({text:`元素封印：${ELEMENTS[rElem].name}（封印中）`, cls:'result-lose'});
+    }
+    gain += eGain;
+    if(!(enemy && enemy.sealedElem === rElem && hasEnemySkill(enemy, 'sealElem')))
+      tags.push({text:`五行命中：${ELEMENTS[rElem].name} ×${MULT.element}`, cls:'result-win'});
+    else
+      tags.push({text:`五行命中：${ELEMENTS[rElem].name} ×${elemShownMult.toFixed(1)}`, cls:'result-win'});
+    if(hasRelic('chiyanfu') && rElem===1) { gain += bet*0.5; tags.push({text:'赤炎符 +0.5×', cls:'result-bonus'}); }
+    if(hasRelic('baijin') && rElem===3)  { gain += bet*0.3; tags.push({text:'白金刃 +0.3×', cls:'result-bonus'}); }
+    if(hasRelic('huangtufu') && rElem===2){ gain += bet*0.3; tags.push({text:'黄土符 +0.3×', cls:'result-bonus'}); }
+  }
+
+  // ── 生肖命中 ──
+  if(zodHit) {
+    gain += bet * MULT.zodiac;
+    tags.push({text:`生肖命中：${ZODIACS[rZod].name} ×${MULT.zodiac}`, cls:'result-win'});
+    if(hasRelic('zhuyueling')) { gain += bet*0.2; tags.push({text:'逐月铃 +0.2×', cls:'result-bonus'}); }
+  }
+
+  // ── 双命中 ──
+  if(bothHit) {
+    let bonus = bet * MULT.bothBonus;
+    // 大衍术士【天机壁障】：双命中额外加成减半
+    if(hasEnemySkill(enemy, 'halveDouble')) {
+      if(hasRelic('fengrang') && !gs.fengrangUsed) {
+        bonus *= 0.75;
+        gs.fengrangUsed = true;
+        tags.push({text:'🧿 封禳符：天机壁障效果减半', cls:'result-bonus'});
+      } else {
+        bonus *= 0.5;
+      }
+      addEnemyActive('halveDouble');
+      tags.push({text:'天机壁障：双命中额外加成受压制', cls:'result-lose'});
+    }
+    gain += bonus;
+    tags.push({text:`双命中加成 +${(bonus/bet).toFixed(1)}×`, cls:'result-bonus'});
+    if(hasRelic('wudelun') && !gs.wudelunUsed) {
+      gs.wudelunUsed = true;
+      gain += bet * 1.2;
+      tags.push({text:'🎡 五德轮：首个双命中 +1.2×', cls:'result-bonus'});
+    }
+  }
+
+  // ── 相生 ──
+  const shengBonus = SHENG[rElem] === bElem && !elemHit;
+  if(shengBonus) {
+    let sm = MULT.sheng;
+    // 生生环：相生倍率×2（每局仅一次）
+    if(hasRelic('shenghuan') && !gs.shenghuanUsed) {
+      sm *= 2;
+      gs.shenghuanUsed = true;
+      tags.push({text:'🔄 生生环：相生倍率×2！（已消耗）', cls:'result-bonus'});
+    }
+    gain += bet * sm;
+    tags.push({text:`相生命中：${ELEMENTS[rElem].name}生${ELEMENTS[bElem].name} ×${sm.toFixed(1)}`, cls:'result-bonus'});
+  }
+
+  // 相克
+  const keHit = KE[rElem] === bElem;
+  if(keHit) {
+    // 五行道士【克制强化】：相克惩罚提高
+    let keMult = hasEnemySkill(enemy, 'doubleKePenalty')
+      ? MULT.kePenaltyRate * 2
+      : MULT.kePenaltyRate;
+    if(hasEnemySkill(enemy, 'doubleKePenalty') && hasRelic('fengrang') && !gs.fengrangUsed) {
+      keMult = MULT.kePenaltyRate * 1.5;
+      gs.fengrangUsed = true;
+      tags.push({text:'🧿 封禳符：克制强化效果减半', cls:'result-bonus'});
+    }
+    if(hasEnemySkill(enemy, 'doubleKePenalty')) addEnemyActive('doubleKePenalty');
+    if(hasRelic('niming') && !gs.nimingUsed) {
+      gs.nimingUsed = true;
+      keMult *= 0.5;
+      tags.push({text:'🀄 逆命骨牌：首次相克惩罚减半', cls:'result-bonus'});
+    }
+    if(hasRelic('lunhui')) {
+      // 轮回珠：相克惩罚转为奖励
+      gain += bet * keMult;
+      tags.push({text:`💎 轮回盘：化克为利 +${keMult}×`, cls:'result-bonus'});
+    } else if(hasRelic('kezhi')) {
+      // 克制令已在 doSpin 中规避相克，这里作为兜底
+      tags.push({text:'📜 克制令：已规避相克', cls:'result-bonus'});
+    } else if(hasRelic('xuanshui') && rElem===4) {
+      gain += bet * 0.3;
+      tags.push({text:'玄水镜：水克转益 +0.3×', cls:'result-bonus'});
+    } else if(hasRelic('qingmuy') && bElem===0) {
+      tags.push({text:'青木芽：克制抵消', cls:'result-bonus'});
+    } else {
+      gain -= bet * keMult;
+      const extra = keMult > MULT.kePenaltyRate ? '（克制强化）' : '';
+      tags.push({text:`相克惩罚：${ELEMENTS[rElem].name}克${ELEMENTS[bElem].name} ×${keMult} ${extra}`, cls:'result-lose'});
+    }
+  }
+
+  // 大衍术士【七星回煞】：每3回合净收益 -30
+  if(hasEnemySkill(enemy, 'every3reduce30') && enemy.roundCount % 3 === 0) {
+    const reduce = (hasRelic('fengrang') && !gs.fengrangUsed) ? 15 : 30;
+    if(reduce === 15) {
+      gs.fengrangUsed = true;
+      tags.push({text:'🧿 封禳符：七星回煞效果减半', cls:'result-bonus'});
+    }
+    addEnemyActive('every3reduce30');
+    gain -= reduce;
+    tags.push({text:`⭐ 七星回煞：本回合收益-${reduce}`, cls:'result-lose'});
+  }
+
+  const rawNetGain = Math.round(gain);
+  const enemyNet = calcEnemyNetBasic(rElem, rZod, bet, enemy ? enemy.betElem : 0, enemy ? enemy.betZod : 0);
+  const roundDiff = rawNetGain - enemyNet;
+  const playerWin = roundDiff > 0;
+  const enemyWin = roundDiff < 0;
+
+  // 大衍术士【大衍宣言】：命中宣言五行时对敌伤害提高
+  let dmgMult = 1;
+  if(enemy && enemy.declaredElem !== null && rElem === enemy.declaredElem && playerWin) {
+    if(hasRelic('fengrang') && !gs.fengrangUsed) {
+      dmgMult = 1.5;
+      gs.fengrangUsed = true;
+      tags.push({text:'🧿 封禳符：大衍宣言效果减半', cls:'result-bonus'});
+      tags.push({text:`📯 大衍宣言命中（${ELEMENTS[rElem].name}）：伤害×1.5`, cls:'result-bonus'});
+    } else {
+      dmgMult = 2;
+      tags.push({text:`📯 大衍宣言命中（${ELEMENTS[rElem].name}）：伤害×2`, cls:'result-bonus'});
+    }
+    addEnemyActive('declare');
+  }
+
+  // ── Apply gain to player gold ──
+  const netGain = rawNetGain;
+  gs.gold = Math.max(0, gs.gold + netGain);
+  tags.push({
+    text:`⚖️ 回合对比：我方 ${netGain >= 0 ? '+' : ''}${netGain} vs 敌方 ${enemyNet >= 0 ? '+' : ''}${enemyNet}`,
+    cls: playerWin ? 'result-win' : (enemyWin ? 'result-lose' : 'result-bonus')
+  });
+
+  // ── Deal damage to enemy (or take life damage) ──
+  let extraLifeDamage = 0;
+  if(playerWin) {
+    // Damage enemy
+    let dmg = Math.max(0, roundDiff) * dmgMult;
+    if(enemy) {
+      if(enemy.shield > 0) {
+        const absorbed = Math.min(enemy.shield, dmg);
+        enemy.shield -= absorbed;
+        dmg -= absorbed;
+        if(absorbed > 0) {
+          addEnemyActive('shield');
+          tags.push({text:`🛡 护盾吸收 ${absorbed} 伤害`, cls:'result-bonus'});
+        }
+      }
+      enemy.hp -= dmg;
+      // 轮回使者【轮回复苏】：HP 降至40%时自愈80
+      if(hasEnemySkill(enemy, 'revive40pct') && !enemy.revivedOnce && enemy.hp <= enemy.maxHp * 0.4) {
+        enemy.hp += 80;
+        enemy.revivedOnce = true;
+        addEnemyActive('revive40pct');
+        tags.push({text:'💚 轮回复苏：敌方回复80HP', cls:'result-lose'});
+      }
+    }
+    // 厚土印
+    if(hasRelic('houtuyin')) gs.armor++;
+    if(enemy && enemy.hp <= 0 && hasRelic('jubao')) {
+      gs.gold += 8;
+      tags.push({text:'🏺 小聚宝盆：战斗胜利 +8金币', cls:'result-bonus'});
+    }
+  } else if(enemyWin) {
+    // Player takes life damage
+    let damage = 1;
+    // 幽冥判官【幽冥判决】：偶数回合落败额外-1命元
+    if(hasEnemySkill(enemy, 'onLoseEvenExtraLife') && enemy.roundCount % 2 === 0) {
+      if(hasRelic('fengrang') && !gs.fengrangUsed) {
+        gs.fengrangUsed = true;
+        tags.push({text:'🧿 封禳符：幽冥判决效果减半（本次免额外命元）', cls:'result-bonus'});
+      } else {
+        extraLifeDamage = 1;
+        addEnemyActive('onLoseEvenExtraLife');
+        tags.push({text:'⚖️ 幽冥判决：额外扣除1命元', cls:'result-lose'});
+      }
+    }
+    if(hasRelic('zhisun') && !gs.zhisunUsed) {
+      gs.zhisunUsed = true;
+      if(extraLifeDamage > 0) extraLifeDamage = Math.max(0, extraLifeDamage - 1);
+      else damage = Math.max(0, damage - 1);
+      tags.push({text:'🧷 止损签：首败命元损失 -1', cls:'result-bonus'});
+    }
+    if(gs.armor > 0) {
+      const absorbed = Math.min(gs.armor, damage);
+      gs.armor -= absorbed;
+      if(absorbed < damage) {
+        const lifeLost = damage - absorbed;
+        gs.life -= lifeLost;
+        showLifeLossEffect(lifeLost);
+      }
+    } else {
+      gs.life -= damage;
+      showLifeLossEffect(damage);
+    }
+    if(extraLifeDamage > 0) {
+      gs.life -= extraLifeDamage;
+      showLifeLossEffect(extraLifeDamage);
+    }
+  } else {
+    tags.push({text:'🤝 回合平局：双方都未占优', cls:'result-bonus'});
+  }
+
+  // ── Render ──
+  renderResult(
+    netGain,
+    enemyNet,
+    rElem,
+    rZod,
+    bElem,
+    bZod,
+    enemy ? enemy.betElem : null,
+    enemy ? enemy.betZod : null,
+    tags,
+    enemy && enemy.hp <= 0
+  );
+  renderHUD();
+  updateEnemyInfo();
+
+  // Flash HP bar on damage
+  if(playerWin) {
+    const fill = document.getElementById('enemy-hp-fill');
+    fill.classList.remove('hp-flash');
+    requestAnimationFrame(()=>fill.classList.add('hp-flash'));
+  }
+
+  // ── Check game over ──
+  if(gs.life <= 0) {
+    setTimeout(() => {
+      document.getElementById('go-stats').textContent =
+        `节点 ${gs.nodeIndex+1}/${NODE_SEQ.length} · 鏈€缁堥噾甯?${gs.gold}`;
+      showScreen('gameover-screen');
+    }, 2000);
+    return;
+  }
+
+  // ── Check enemy defeated ──
+  if(enemy && enemy.hp <= 0) {
+    setTimeout(() => showReward(), 1500);
+  }
+}
+
+function renderResult(netGain, enemyNet, rElem, rZod, bElem, bZod, enemyElem, enemyZod, tags, enemyDead) {
+  const panel = document.getElementById('result-panel');
+  const content = document.getElementById('result-content');
+  panel.classList.add('show');
+
+  const e = gs.currentEnemy;
+  const dmgLine = (e)
+    ? `<div style="margin-top:6px;font-size:12px;color:#888;">
+        对 <span style="color:${e.color}">${e.name}</span> 造成伤害：
+        剩余 <span style="color:#e74c3c;font-weight:700">${Math.max(0,e.hp)}</span>/<span>${e.maxHp}</span> HP
+       </div>`
+    : '';
+
+  const html = `
+    <div class="result-row">
+      <span class="result-tag" style="background:${ELEMENTS[rElem].color}22;color:${ELEMENTS[rElem].color};border:1px solid ${ELEMENTS[rElem].color}66">
+        五行：${ELEMENTS[rElem].name}
+      </span>
+      <span class="result-tag" style="background:${ZODIACS[rZod].color}22;color:${ZODIACS[rZod].color};border:1px solid ${ZODIACS[rZod].color}66">
+        生肖：${ZODIACS[rZod].name}
+      </span>
+    </div>
+    <div class="result-row" style="margin-top:6px;">
+      <span class="result-tag" style="background:${ELEMENTS[bElem].color}22;color:${ELEMENTS[bElem].color};border:1px solid ${ELEMENTS[bElem].color}66">我方：${ELEMENTS[bElem].name}/${ZODIACS[bZod].name}</span>
+      <span class="result-tag" style="background:${ELEMENTS[enemyElem].color}22;color:${ELEMENTS[enemyElem].color};border:1px solid ${ELEMENTS[enemyElem].color}66">敌方：${ELEMENTS[enemyElem].name}/${ZODIACS[enemyZod].name}</span>
+    </div>
+    <div class="result-row" style="margin-top:6px;">
+      ${tags.map(t=>`<span class="result-tag ${t.cls}">${t.text}</span>`).join('')}
+    </div>
+    <div style="margin-top:10px;display:flex;align-items:baseline;gap:8px;">
+      <span class="payout-big ${netGain<0?'payout-neg':''}">我方 ${netGain>0?'+':''}${netGain}</span>
+      <span class="payout-big ${enemyNet<0?'payout-neg':''}" style="font-size:18px;">敌方 ${enemyNet>0?'+':''}${enemyNet}</span>
+      <span style="font-size:13px;color:#666;">（余额 ${gs.gold}）</span>
+    </div>
+    ${dmgLine}
+  `;
+  content.innerHTML = html;
+
+  // Update next button text
+  const nextBtn = document.getElementById('next-btn');
+  if(gs.life <= 0) {
+    nextBtn.textContent = '命元耗尽...';
+    nextBtn.disabled = true;
+    return;
+  }
+  if(enemyDead || (e && e.hp <= 0)) {
+    nextBtn.textContent = '战斗胜利！';
+  } else {
+    nextBtn.textContent = '继续下注';
+  }
+  nextBtn.disabled = false;
+}
+
+function onNext() {
+  const e = gs.currentEnemy;
+  if(e && e.hp <= 0) {
+    // Enemy dead - go to reward (already triggered via setTimeout, guard double-call)
+    return;
+  }
+  gs.settled = false;
+  document.getElementById('result-panel').classList.remove('show');
+  document.getElementById('spin-btn').disabled = false;
+  drawWheel();
+}
+
+//  SHOW REWARD
+function showReward() {
+  // Pick 3 random relics not yet owned
+  const available = RELICS_DATA.filter(r => !gs.relics.includes(r.id));
+  if(available.length === 0) {
+    advanceNode();
+    return;
+  }
+  // Shuffle and take up to 3
+  const shuffled = available.sort(()=>Math.random()-0.5).slice(0,3);
+
+  const container = document.getElementById('reward-items');
+  container.innerHTML = '';
+  shuffled.forEach(r => {
+    const card = document.createElement('div');
+    card.className = `reward-card ${r.rarity}`;
+    card.innerHTML = `
+      <div class="reward-icon">${r.icon}</div>
+      <div class="reward-name">${r.name}</div>
+      <div class="reward-rarity" style="color:${rarityColor(r.rarity)}">${RARITY_LABEL[r.rarity]}</div>
+      <div class="reward-desc">${r.desc}</div>
+    `;
+    card.onclick = () => {
+      gs.relics.push(r.id);
+      applyRelicOnAcquire(r.id);
+      advanceNode();
+    };
+    container.appendChild(card);
+  });
+
+  showScreen('reward-screen');
+}
+
+function skipReward() { advanceNode(); }
+
+function rarityColor(r) {
+  return { common:'#aaa', rare:'#56d8ff', epic:'#d8a7ea', legendary:'#d4af37' }[r];
+}
+
+//  NODE ADVANCEMENT
+function advanceNode() {
+  gs.nodeIndex++;
+  if(gs.nodeIndex >= NODE_SEQ.length) {
+    // Victory
+    document.getElementById('vic-stats').textContent =
+      `共${NODE_SEQ.length}节点全通关 · 金币 ${gs.gold} · 遗物 ${gs.relics.length}`;
+    showScreen('victory-screen');
+    return;
+  }
+  const nodeType = NODE_SEQ[gs.nodeIndex];
+  if(nodeType === 'shop') {
+    openShop();
+  } else {
+    openBattle();
+  }
+}
+
+// ── Open Battle ──
+function openBattle() {
+  const template = getEnemyForNode(gs.nodeIndex);
+  gs.currentEnemy = initEnemy(template);
+  resetBattleRelicFlags();
+  rerollSpinRelicState();
+  gs.settled = false;
+  gs.pendingElem = null;
+  gs.pendingZod = null;
+
+  document.getElementById('result-panel').classList.remove('show');
+  document.getElementById('spin-btn').disabled = false;
+
+  showScreen('battle-screen');
+  renderHUD();
+  renderMap();
+  renderRelicsBar();
+  updateEnemyInfo();
+  drawWheel();
+}
+
+// ── Open Shop ──
+function openShop() {
+  renderMap(); // update map
+  const shopBar = document.getElementById('map-bar-shop');
+  shopBar.innerHTML = document.getElementById('map-bar').innerHTML;
+
+  // Build shop items (3 random unowned)
+  const available = RELICS_DATA.filter(r => !gs.relics.includes(r.id));
+  const items = available.sort(()=>Math.random()-0.5).slice(0,3);
+
+  const container = document.getElementById('shop-items');
+  container.innerHTML = '';
+  items.forEach(r => {
+    const card = document.createElement('div');
+    card.className = `shop-card`;
+    card.innerHTML = `
+      <span style="font-size:28px">${r.icon}</span>
+      <div class="shop-info">
+        <div class="shop-name" style="color:${rarityColor(r.rarity)}">${r.name}
+          <span style="font-size:11px;color:#666;margin-left:6px">${RARITY_LABEL[r.rarity]}</span>
+        </div>
+        <div class="shop-desc">${r.desc}</div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
+        <div class="shop-price">🪙${r.price}</div>
+        <button class="shop-buy-btn" onclick="buyRelic('${r.id}', ${r.price}, this)">购买</button>
+      </div>
+    `;
+    container.appendChild(card);
+  });
+
+  if(items.length === 0) {
+    container.innerHTML = '<div style="color:#555;font-size:14px;padding:16px 0;">所有遗物已集齐</div>';
+  }
+
+  // Update shop relics bar
+  const relicsBarShop = document.getElementById('relics-bar-shop');
+  if(relicsBarShop) renderRelicsBar(relicsBarShop);
+
+  // Update shop HUD
+  const shud = document.querySelector('#shop-screen #hud');
+  if(shud) syncShopHud(shud);
+
+  showScreen('shop-screen');
+}
+
+function buyRelic(id, price, btn) {
+  if(gs.gold < price) { alert('金币不足'); return; }
+  if(gs.relics.includes(id)) { alert('已拥有此遗物'); return; }
+  gs.gold -= price;
+  gs.relics.push(id);
+  applyRelicOnAcquire(id);
+  btn.textContent = '✓ 已购入';
+  btn.disabled = true;
+  btn.closest('.shop-card').classList.add('sold');
+  const shud = document.querySelector('#shop-screen #hud');
+  if(shud) syncShopHud(shud);
+  const relicsBarShop = document.getElementById('relics-bar-shop');
+  if(relicsBarShop) renderRelicsBar(relicsBarShop);
+}
+
+function leaveShop() { advanceNode(); }
+
+//  RELICS BAR
+function renderRelicsBar(el) {
+  el = el || document.getElementById('relics-bar');
+  if(!el) return;
+  if(gs.relics.length === 0) {
+    el.innerHTML = '<span style="color:#444;font-size:13px;">尚无遗物</span>';
+    return;
+  }
+  el.innerHTML = '';
+  ownedRelicData().forEach(r => {
+    const badge = document.createElement('div');
+    badge.className = `relic-badge rarity-${r.rarity}`;
+    badge.innerHTML = `${r.icon} ${r.name}`;
+    badge.onclick = (ev) => { ev.stopPropagation(); showRelicPopup(r, badge); };
+    el.appendChild(badge);
+  });
+}
+
+//  INIT
+window.addEventListener('load', () => {
+  showScreen('start-screen');
+});
+</script>
+</body>
+</html>
+
